@@ -67,7 +67,11 @@ class MarathonClient(object):
                 response = self.session.request(
                     method, url, params=params, data=data, headers=headers,
                     auth=self.auth, timeout=self.timeout)
-                marathon.log.info('Got response from %s', server)
+                status_code = response.status_code if response else None
+                marathon.log.info('Got response from {}, status {} | method {}, url {}, '
+                                  'params {}, data {}, headers {}, auth {}, timeout {}'
+                                  .format(server, status_code, method, url, params,
+                                          data, headers, self.auth, self.timeout))
             except requests.exceptions.RequestException as e:
                 marathon.log.error(
                     'Error while calling %s: %s', url, str(e))
@@ -76,24 +80,23 @@ class MarathonClient(object):
             raise MarathonError('Marathon is unreachable, please check 1. Marathon or Puck is down. '
                                 '2. Tunnel lost connection.')
 
-        response_text = response.text
-        if isinstance(response.text, unicode):
-            response_text = response.text.encode("utf-8")
-        log_text = 'Got HTTP {code}: {body}'.format(
-                code=response.status_code, body=response_text)
         if response.status_code >= 500:
-            marathon.log.error(log_text)
+            marathon.log.error('Got HTTP {code}: {body}'.format(
+                code=response.status_code, body=response.content))
             raise InternalServerError(response)
         elif response.status_code >= 400:
-            marathon.log.error(log_text)
+            marathon.log.error('Got HTTP {code}: {body}'.format(
+                code=response.status_code, body=response.content))
             if response.status_code == 404:
                 raise NotFoundError(response)
             else:
                 raise MarathonHttpError(response)
         elif response.status_code >= 300:
-            marathon.log.warn(log_text)
-        else:
-            marathon.log.debug(log_text)
+            marathon.log.warn('Got HTTP {code}: {body}'.format(
+                code=response.status_code, body=response.content))
+        # else:
+        #     marathon.log.debug('Got HTTP {code}: {body}'.format(
+        #         code=response.status_code, body=response.content))
 
         return response
 
